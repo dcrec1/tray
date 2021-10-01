@@ -344,6 +344,8 @@ public class CertificateManager {
             props.putIfAbsent(String.format("%s.host", keyPair.propsPrefix()), ArgValue.SECURITY_WSS_HOST.getDefaultVal());
         }
 
+        props.putIfAbsent("authcert.override", "cert.pem");
+
 
         return props;
     }
