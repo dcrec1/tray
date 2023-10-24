@@ -86,7 +86,6 @@
 
         <copy todir="${dist.dir}">
             <fileset file="LICENSE.txt"/>
-            <fileset file="cert.pem"/>
         </copy>
     </target>
 
