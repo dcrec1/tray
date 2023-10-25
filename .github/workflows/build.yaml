@@ -4,11 +4,13 @@ on: [push, pull_request]
 
 jobs:
   ubuntu:
+    if: ${{ false }}
     runs-on: [ubuntu-latest]
     strategy:
       matrix:
         java: [11]
         arch: [x86_64, aarch64, riscv64]
+        app: [mi, alisto]
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-java@v3
@@ -20,10 +22,16 @@ jobs:
         run: |
           # TODO: remove after migrating to JDK21+
           echo "ANT_ARGS=-Djlink.java.version=21.0.9+15" >> $GITHUB_ENV
-      - run: ant -Dtarget.arch=${{ matrix.arch }} makeself
+      - run: ant -Dtarget.arch=${{ matrix.arch }} -Dauthcert.use=${{ matrix.app }}.pem makeself
+      - name: Read artifact name
+        id: artifact
+        shell: bash
+        run: |
+          file=(out/qz-tray-*.run)
+          echo "name=${{ matrix.app }}-$(basename "${file[0]}" .run)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
-          name: qz-tray-linux-${{ matrix.arch }}
+          name: ${{ steps.artifact.outputs.name }}
           path: out/qz-tray-*.run
       - if: ${{ matrix.arch == 'x86_64' }}
         run: |
@@ -35,24 +43,32 @@ jobs:
           sudo DEBUG=true out/qz-tray-*.run
           /opt/qz-tray/qz-tray --version
           sudo apt-get install nsis
-          ant nsis
+          ant -Dauthcert.use=${{ matrix.app }}.pem nsis
 
   macos:
+    if: ${{ false }}
     runs-on: [macos-latest]
     strategy:
       matrix:
         java: [11]
         arch: [x86_64, aarch64]
+        app: [mi, alisto]
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-java@v3
         with:
           java-version: ${{ matrix.java }}
           distribution: 'liberica'
-      - run: ant -Dtarget.arch=${{ matrix.arch }} pkgbuild
+      - run: ant -Dtarget.arch=${{ matrix.arch }} -Dauthcert.use=${{ matrix.app }}.pem pkgbuild
+      - name: Read artifact name
+        id: artifact
+        shell: bash
+        run: |
+          file=(out/qz-tray-*.pkg)
+          echo "name=${{ matrix.app }}-$(basename "${file[0]}" .pkg)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
-          name: qz-tray-macos-${{ matrix.arch }}
+          name: ${{ steps.artifact.outputs.name }}
           path: out/qz-tray-*.pkg
       - if: ${{ matrix.arch == 'aarch64' }}
         run: |
@@ -64,8 +80,8 @@ jobs:
           sudo installer -pkg out/qz-tray-*.pkg -target /
           "/Applications/QZ Tray.app/Contents/MacOS/QZ Tray" --version
           brew install nsis makeself
-          ant makeself
-          ant nsis
+          ant -Dauthcert.use=${{ matrix.app }}.pem makeself
+          ant -Dauthcert.use=${{ matrix.app }}.pem nsis
 
   windows:
     runs-on: [windows-latest]
@@ -73,6 +89,7 @@ jobs:
       matrix:
         java: [11]
         arch: [x86_64, aarch64]
+        app: [mi, alisto]
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-java@v3
@@ -80,10 +97,16 @@ jobs:
           java-version: ${{ matrix.java }}
           distribution: 'liberica'
       - run: choco install nsis
-      - run: ant "-Dtarget.arch=${{ matrix.arch }}" nsis
+      - run: ant "-Dtarget.arch=${{ matrix.arch }}" "-Dauthcert.use=${{ matrix.app }}.pem" nsis
+      - name: Read artifact name
+        id: artifact
+        shell: bash
+        run: |
+          file=(out/qz-tray-*.exe)
+          echo "name=${{ matrix.app }}-$(basename "${file[0]}" .exe)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
-          name: qz-tray-windows-${{ matrix.arch }}
+          name: ${{ steps.artifact.outputs.name }}
           path: out/qz-tray-*.exe
       - if: ${{ matrix.arch == 'x86_64' }}
         run: |
@@ -92,5 +115,3 @@ jobs:
           ant testng
           Start-Process -Wait ./out/qz-tray-*.exe -ArgumentList "/S"
           "&'C:/Program Files/QZ Tray/qz-tray.exe' --wait --version|Out-Null"
-
-
