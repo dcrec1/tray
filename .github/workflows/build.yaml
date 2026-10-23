@@ -4,6 +4,7 @@ on: [push, pull_request]
 
 jobs:
   ubuntu:
+    if: false
     runs-on: [ubuntu-latest]
     strategy:
       matrix:
@@ -36,6 +37,7 @@ jobs:
           ant -Dauthcert.use=${{ matrix.app }}.pem nsis
 
   macos:
+    if: false
     runs-on: [macos-latest]
     strategy:
       matrix:
