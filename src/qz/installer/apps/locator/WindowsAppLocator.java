@@ -74,6 +74,13 @@ public class WindowsAppLocator extends AppLocator{
                         regPath = String.format(basePath, firstMatch);
                         keyExists = true;
                     }
+                } else if(!keyExists) {
+                    // Windows Installer stores products under their product-code GUID, not their display name.
+                    String displayNameMatch = firstKeyWithDisplayName(hive, String.format(basePath, ""), appName);
+                    if(displayNameMatch != null) {
+                        regPath = String.format(basePath, displayNameMatch);
+                        keyExists = true;
+                    }
                 }
                 if(!keyExists) {
                     continue;
@@ -134,6 +141,23 @@ public class WindowsAppLocator extends AppLocator{
             }
             if(key.startsWith(appName)) {
                 log.info("Matched '{}' at '{}'", appName, key);
+                return key;
+            }
+        }
+
+        return null;
+    }
+
+    private String firstKeyWithDisplayName(WinReg.HKEY hive, String basePath, String appName) {
+        String[] keys = WindowsUtilities.getRegistryKeys(hive, basePath);
+        if(keys == null) {
+            return null;
+        }
+
+        for(String key : keys) {
+            String displayName = WindowsUtilities.getRegString(hive, basePath + key, "DisplayName");
+            if(appName.equalsIgnoreCase(displayName)) {
+                log.info("Matched '{}' at '{}' by DisplayName", appName, key);
                 return key;
             }
         }
