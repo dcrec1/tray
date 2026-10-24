@@ -132,6 +132,13 @@ public class PrintSocketServer {
                 websocketPorts.setHttpOnly(secureConnector == null);
                 trayManager.setServer(server, websocketPorts);
                 server.join();
+                // A tray reload clears running before stopping Jetty. If join returns while it is still true,
+                // Jetty stopped unexpectedly; clear it so the outer loop attempts to restart the server.
+                if (running.getAndSet(false)) {
+                    log.error("WebSocket server stopped unexpectedly; attempting to restart");
+                    trayManager.setDangerIcon();
+                    trayManager.displayErrorMessage("A conexão de impressão foi interrompida. O QZ Tray está tentando reconectar.");
+                }
             }
             catch(IOException | MultiException e) {
                 //order of getConnectors is the order we added them -> insecure first
