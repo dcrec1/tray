@@ -11,7 +11,6 @@ import qz.ui.component.IconCache;
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.awt.image.DataBufferInt;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -188,24 +187,14 @@ public class ImageUtilities {
         int height = bi.getHeight();
 
         int colorNoAlpha = color.getRGB() & 0x00FFFFFF;
+        BufferedImage colored = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
 
-        if (bi.getType() == BufferedImage.TYPE_INT_ARGB || bi.getType() == BufferedImage.TYPE_INT_ARGB_PRE) {
-            //  Array ARGB-backed images
-            int[] pixels = ((DataBufferInt) bi.getRaster().getDataBuffer()).getData();
-            for (int i = 0; i < pixels.length; i++) {
-                int alpha = pixels[i] & 0xFF000000;
-                pixels[i] = alpha | colorNoAlpha;
-            }
-        } else {
-            // Call setRGB() for all other image types
-            for (int y = 0; y < height; y++) {
-                for (int x = 0; x < width; x++) {
-                    int p = bi.getRGB(x, y);
-                    int alpha = p & 0xFF000000;
-                    bi.setRGB(x, y, alpha | colorNoAlpha);
-                }
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int alpha = bi.getRGB(x, y) & 0xFF000000;
+                colored.setRGB(x, y, alpha | colorNoAlpha);
             }
         }
-        return bi;
+        return colored;
     }
 }
