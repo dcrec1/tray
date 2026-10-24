@@ -27,11 +27,16 @@ import qz.printer.action.windows.WindowsRawUtils;
 import qz.printer.info.NativePrinter;
 import qz.printer.status.CupsUtils;
 import qz.utils.*;
+import qz.ws.PrintSocketServer;
 
 import javax.print.*;
 import javax.print.attribute.HashPrintRequestAttributeSet;
 import javax.print.attribute.PrintRequestAttributeSet;
+import javax.print.attribute.PrintJobAttributeSet;
+import javax.print.attribute.PrintServiceAttributeSet;
 import javax.print.attribute.standard.JobName;
+import javax.print.attribute.standard.JobMessageFromOperator;
+import javax.print.attribute.standard.PrinterMessageFromOperator;
 import javax.print.event.PrintJobEvent;
 import javax.print.event.PrintJobListener;
 import java.awt.image.BufferedImage;
@@ -42,6 +47,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Sends raw data to the printer, overriding your operating system's print
@@ -276,6 +282,8 @@ public class PrintRaw implements PrintProcessor {
 
     protected void waitForPrint(DocPrintJob printJob, Doc doc, PrintRequestAttributeSet attributes) throws PrintException {
         final AtomicBoolean finished = new AtomicBoolean(false);
+        final AtomicBoolean failed = new AtomicBoolean(false);
+        final AtomicReference<String> failureReason = new AtomicReference<>();
         printJob.addPrintJobListener(new PrintJobListener() {
             @Override
             public void printDataTransferCompleted(PrintJobEvent printJobEvent) {
@@ -292,7 +300,14 @@ public class PrintRaw implements PrintProcessor {
             @Override
             public void printJobFailed(PrintJobEvent printJobEvent) {
                 log.error("{}", printJobEvent);
+                DocPrintJob failedJob = printJobEvent.getPrintJob();
+                failureReason.set(getPrintFailureReason(failedJob.getAttributes(), failedJob.getPrintService().getAttributes()));
+                failed.set(true);
                 finished.set(true);
+                String reason = failureReason.get();
+                PrintSocketServer.getTrayManager().displayErrorMessage(reason == null
+                        ? "O sistema de impressão informou uma falha, mas não forneceu o motivo. Verifique a fila, o driver e a impressora."
+                        : "Falha informada pelo sistema de impressão: " + reason + ". Verifique a fila, o driver e a impressora.");
             }
 
             @Override
@@ -320,7 +335,32 @@ public class PrintRaw implements PrintProcessor {
             try { Thread.sleep(100); } catch(Exception ignore) {}
         }
 
+        if (failed.get()) {
+            throw new PrintJobFailedException(failureReason.get() == null
+                    ? "O sistema de impressão não forneceu uma descrição da causa"
+                    : failureReason.get());
+        }
+
         log.trace("Print job received by printer");
+    }
+
+    static String getPrintFailureReason(PrintJobAttributeSet jobAttributes, PrintServiceAttributeSet printerAttributes) {
+        JobMessageFromOperator message = (JobMessageFromOperator) jobAttributes.get(JobMessageFromOperator.class);
+        if (message != null && !message.getValue().isEmpty()) {
+            return message.getValue();
+        }
+
+        PrinterMessageFromOperator printerMessage = (PrinterMessageFromOperator) printerAttributes.get(PrinterMessageFromOperator.class);
+        if (printerMessage != null && !printerMessage.getValue().isEmpty()) {
+            return printerMessage.getValue();
+        }
+        return null;
+    }
+
+    public static class PrintJobFailedException extends PrintException {
+        public PrintJobFailedException(String reason) {
+            super(reason);
+        }
     }
 
     /**

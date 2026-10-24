@@ -18,6 +18,7 @@ import qz.printer.PrintServiceMatcher;
 import qz.printer.action.*;
 import qz.printer.info.NativePrinter;
 import qz.printer.status.CupsUtils;
+import qz.ws.PrintSocketServer;
 import qz.ws.PrintSocketClient;
 
 import javax.print.PrintException;
@@ -242,14 +243,33 @@ public class PrintingUtilities {
             processor.print(output, options);
             log.info("Printing complete");
 
+            if (output.isSetService()) {
+                String message = SystemUtilities.isWindows()
+                        ? "Pedido enviado pelo QZ Tray para a fila do Windows. Isso confirma o envio ao Windows, não a impressão física. Se nada sair, verifique a fila, o driver e a impressora."
+                        : "Pedido enviado pelo QZ Tray ao sistema de impressão. Isso não confirma a impressão física. Se nada sair, verifique a fila e a impressora.";
+                PrintSocketServer.getTrayManager().displayInfoMessage(message);
+            }
+
             PrintSocketClient.sendResult(session, UID, null);
         }
         catch(PrinterAbortException e) {
             log.warn("Printing cancelled");
             PrintSocketClient.sendError(session, UID, "Printing cancelled");
         }
+        catch(PrintRaw.PrintJobFailedException e) {
+            log.error("Failed to print", e);
+            PrintSocketClient.sendError(session, UID, e);
+        }
+        catch(PrintException e) {
+            log.error("Failed to print", e);
+            String reason = e.getLocalizedMessage() == null ? e.getClass().getSimpleName() : e.getLocalizedMessage();
+            PrintSocketServer.getTrayManager().displayErrorMessage("O sistema de impressão informou uma falha: " + reason + ". Verifique a fila, o driver e a impressora.");
+            PrintSocketClient.sendError(session, UID, e);
+        }
         catch(Exception e) {
             log.error("Failed to print", e);
+            String reason = e.getLocalizedMessage() == null ? e.getClass().getSimpleName() : e.getLocalizedMessage();
+            PrintSocketServer.getTrayManager().displayErrorMessage("O pedido chegou ao QZ Tray, mas falhou durante o processamento: " + reason);
             PrintSocketClient.sendError(session, UID, e);
         }
         finally {

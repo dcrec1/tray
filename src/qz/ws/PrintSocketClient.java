@@ -326,6 +326,7 @@ public class PrintSocketClient {
                 sendResult(session, UID, null);
                 break;
             case PRINT:
+                trayManager.displayInfoMessage("Pedido de impressão recebido pelo QZ Tray.");
                 PrintingUtilities.processPrintRequest(session, UID, params);
                 break;
 
